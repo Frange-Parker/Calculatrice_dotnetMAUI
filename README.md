@@ -53,7 +53,7 @@ Sous Windows, choisir la cible **« Machine Windows »** dans Visual Studio, pui
 
 ## Livrables
 - Rapport : docs/rapport_avancement.pdf
-- Vidéo : video/presentation
+- Vidéo : video/video_demo_calculatrice_dotnetMaui
 
 
 

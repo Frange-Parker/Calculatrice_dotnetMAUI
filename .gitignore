@@ -468,6 +468,8 @@ ehthumbs_vista.db
 # Recycle Bin used on file shares
 $RECYCLE.BIN/
 
+Calculatrice_dotnetMAUI/
+
 # Windows Installer files
 *.cab
 *.msi
