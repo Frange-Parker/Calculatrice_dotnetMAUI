@@ -1,0 +1,291 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<!-- Page principale de la calculatrice. Les couleurs et styles sont définis dans Resources ci-dessous. -->
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="calculatrice.MainPage"
+             NavigationPage.HasNavigationBar="False"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{StaticResource ColorBackground}">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+
+            <!-- ============================================================ -->
+            <!-- PALETTE DE COULEURS : modifiez uniquement ces valeurs         -->
+            <!-- pour changer l'apparence de toute la calculatrice.            -->
+            <!-- ============================================================ -->
+            <Color x:Key="ColorBackground">#000000</Color>          <!-- Fond de la page -->
+            <Color x:Key="ColorKeyBackground">#000000</Color>       <!-- Fond des touches normales -->
+            <Color x:Key="ColorNumberText">#FFFFFF</Color>          <!-- Texte des chiffres -->
+            <Color x:Key="ColorOperatorText">#DC143C</Color>        <!-- Crimson : opérateurs (+ - × ÷) et actions (AC, ⌫, %, ±) -->
+            <Color x:Key="ColorFunctionText">#B89AA0</Color>        <!-- Gris rosé : fonctions scientifiques -->
+            <Color x:Key="ColorFunctionActive">#FF3B5C</Color>      <!-- Crimson clair : bouton 2nd actif (utilisée dans le code-behind) -->
+            <Color x:Key="ColorEqualBackground">#82001F</Color>     <!-- Crimson : fond de la touche = -->
+            <Color x:Key="ColorEqualText">#FFFFFF</Color>           <!-- Texte de la touche = -->
+            <Color x:Key="ColorResultText">#FFFFFF</Color>          <!-- Texte du résultat -->
+            <Color x:Key="ColorOperationText">#B89AA0</Color>       <!-- Gris rosé : opération en cours -->
+            <Color x:Key="ColorHeaderIcon">#FFFFFF</Color>          <!-- Icônes de l'en-tête (historique, mode) -->
+            <Color x:Key="ColorKeyBorder">#4A0D1A</Color>           <!-- Crimson très sombre : bordure des touches -->
+            <Color x:Key="ColorKeyPressed">#2A0A10</Color>          <!-- Fond rouge sombre : touches pendant l'appui -->
+            <Color x:Key="ColorEqualPressed">#A50F2D</Color>        <!-- Crimson foncé : touche = pendant l'appui -->
+            <!-- ============================================================ -->
+            <!-- STYLE DE BASE : commun à toutes les touches                   -->
+            <!-- ============================================================ -->
+            <Style x:Key="BaseButton" TargetType="Button">
+                <!-- Fond par défaut -->
+                <Setter Property="BackgroundColor" Value="{StaticResource ColorKeyBackground}" />
+                <!-- Bordure fine autour de chaque touche -->
+                <Setter Property="BorderColor" Value="{StaticResource ColorKeyBorder}" />
+                <Setter Property="BorderWidth" Value="1" />
+                <!-- Coins arrondis -->
+                <Setter Property="CornerRadius" Value="12" />
+                <!-- Retour visuel : le fond change pendant l'appui sur la touche -->
+                <Setter Property="VisualStateManager.VisualStateGroups">
+                    <VisualStateGroupList>
+                        <VisualStateGroup x:Name="CommonStates">
+                            <VisualState x:Name="Normal" />
+                            <VisualState x:Name="Pressed">
+                                <VisualState.Setters>
+                                    <Setter Property="BackgroundColor" Value="{StaticResource ColorKeyPressed}" />
+                                </VisualState.Setters>
+                            </VisualState>
+                        </VisualStateGroup>
+                    </VisualStateGroupList>
+                </Setter>
+                <!-- Pas de marge interne : permet aux touches de rétrécir en paysage -->
+                <Setter Property="Padding" Value="0" />
+                <!-- Autorise la touche à être plus petite que la taille par défaut de la plateforme -->
+                <Setter Property="MinimumHeightRequest" Value="0" />
+                <Setter Property="MinimumWidthRequest" Value="0" />
+            </Style>
+
+            <!-- Style des boutons de l'en-tête (historique, changement de mode) -->
+            <Style x:Key="HeaderButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
+                <Setter Property="BackgroundColor" Value="Transparent" />
+                <Setter Property="TextColor" Value="{StaticResource ColorHeaderIcon}" />
+                <Setter Property="FontSize" Value="24" />
+                <Setter Property="Padding" Value="8,0" />
+                <!-- Pas de bordure pour les icônes de l'en-tête -->
+                <Setter Property="BorderWidth" Value="0" />
+            </Style>
+
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <!-- LAYOUT 1 : Grid racine. Sa structure (lignes/colonnes) est modifiée en code selon l'orientation. -->
+    <!-- Portrait : 3 lignes (en-tête / affichage / clavier). Paysage : 2 colonnes (affichage à gauche / clavier à droite). -->
+    <Grid x:Name="RootGrid" RowDefinitions="Auto, *, 2*" Padding="15, 10, 15, 20">
+
+        <!-- ================= ZONE 1 : EN-TÊTE ================= -->
+        <!-- LAYOUT 2 : HorizontalStackLayout, aligne les boutons d'en-tête côte à côte -->
+        <HorizontalStackLayout x:Name="HeaderLayout" Grid.Row="0" HorizontalOptions="End" Spacing="10">
+            <!-- Bouton pour basculer entre clavier simple et scientifique (masqué en paysage par le code) -->
+            <Button x:Name="BtnToggle" Text="🔄" Clicked="OnToggleModeClicked" Style="{StaticResource HeaderButton}" />
+            <!-- Bouton d'affichage de l'historique -->
+            <Button Text="🕒" Clicked="OnHistoryClicked" Style="{StaticResource HeaderButton}" />
+        </HorizontalStackLayout>
+
+        <!-- ================= ZONE 2 : AFFICHAGE ================= -->
+        <!-- LAYOUT 3 : VerticalStackLayout, empile l'opération au-dessus du résultat -->
+        <VerticalStackLayout x:Name="DisplayLayout" Grid.Row="1" VerticalOptions="End" Spacing="5" Padding="0, 0, 0, 20">
+
+            <!-- LAYOUT 4 : ScrollView horizontal, évite le débordement des longues expressions -->
+            <ScrollView Orientation="Horizontal" HorizontalOptions="End">
+                <!-- Affiche l'opération en cours -->
+                <Label x:Name="OperationLabel" Text="" TextColor="{StaticResource ColorOperationText}" FontSize="24" HorizontalOptions="End" />
+            </ScrollView>
+
+            <!-- Deuxième ScrollView pour le résultat -->
+            <ScrollView Orientation="Horizontal" HorizontalOptions="End">
+                <!-- Affiche la saisie courante ou le résultat -->
+                <Label x:Name="ResultLabel" Text="0" TextColor="{StaticResource ColorResultText}" FontSize="56" FontAttributes="Bold" HorizontalOptions="End" LineBreakMode="NoWrap" />
+            </ScrollView>
+
+        </VerticalStackLayout>
+
+        <!-- ================= ZONE 3 : CLAVIERS ================= -->
+        <!-- Conteneur qui superpose les deux claviers (un seul est visible à la fois) -->
+        <Grid x:Name="KeypadContainer" Grid.Row="2">
+
+            <!-- ============ CLAVIER SIMPLE (4 colonnes) ============ -->
+            <Grid x:Name="SimpleKeypad" IsVisible="True"
+                  RowDefinitions="*, *, *, *, *"
+                  ColumnDefinitions="*, *, *, *"
+                  ColumnSpacing="10" RowSpacing="10">
+
+                <!-- Styles propres au clavier simple (tailles de police plus grandes) -->
+                <Grid.Resources>
+                    <ResourceDictionary>
+                        <!-- Touches chiffres -->
+                        <Style x:Key="NumberButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
+                            <Setter Property="TextColor" Value="{StaticResource ColorNumberText}" />
+                            <Setter Property="FontSize" Value="26" />
+                        </Style>
+                        <!-- Touches opérateurs (+ - × ÷) -->
+                        <Style x:Key="OperatorButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
+                            <Setter Property="TextColor" Value="{StaticResource ColorOperatorText}" />
+                            <Setter Property="FontSize" Value="28" />
+                        </Style>
+                        <!-- Touches d'action (AC, ⌫, %, ±) -->
+                        <Style x:Key="ActionButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
+                            <Setter Property="TextColor" Value="{StaticResource ColorOperatorText}" />
+                            <Setter Property="FontSize" Value="22" />
+                        </Style>
+                        <!-- Touche égal -->
+                        <Style x:Key="EqualButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
+                            <Setter Property="BackgroundColor" Value="{StaticResource ColorEqualBackground}" />
+                            <Setter Property="TextColor" Value="{StaticResource ColorEqualText}" />
+                            <Setter Property="FontSize" Value="28" />
+                            <Setter Property="CornerRadius" Value="40" />
+                            <!-- La touche = garde sa propre couleur d'appui -->
+                            <Setter Property="VisualStateManager.VisualStateGroups">
+                                <VisualStateGroupList>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal" />
+                                        <VisualState x:Name="Pressed">
+                                            <VisualState.Setters>
+                                                <Setter Property="BackgroundColor" Value="{StaticResource ColorEqualPressed}" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateGroupList>
+                            </Setter>
+                        </Style>
+                    </ResourceDictionary>
+                </Grid.Resources>
+
+                <!-- Ligne 0 -->
+                <Button Text="AC" Clicked="OnClearClicked"     Grid.Row="0" Grid.Column="0" Style="{StaticResource ActionButton}" />
+                <Button Text="⌫"  Clicked="OnBackspaceClicked" Grid.Row="0" Grid.Column="1" Style="{StaticResource ActionButton}" />
+                <Button Text="%"  Clicked="OnInputClicked"     Grid.Row="0" Grid.Column="2" Style="{StaticResource ActionButton}" />
+                <Button Text="÷"  Clicked="OnInputClicked"     Grid.Row="0" Grid.Column="3" Style="{StaticResource OperatorButton}" />
+
+                <!-- Ligne 1 -->
+                <Button Text="7" Clicked="OnInputClicked" Grid.Row="1" Grid.Column="0" Style="{StaticResource NumberButton}" />
+                <Button Text="8" Clicked="OnInputClicked" Grid.Row="1" Grid.Column="1" Style="{StaticResource NumberButton}" />
+                <Button Text="9" Clicked="OnInputClicked" Grid.Row="1" Grid.Column="2" Style="{StaticResource NumberButton}" />
+                <Button Text="×" Clicked="OnInputClicked" Grid.Row="1" Grid.Column="3" Style="{StaticResource OperatorButton}" />
+
+                <!-- Ligne 2 -->
+                <Button Text="4" Clicked="OnInputClicked" Grid.Row="2" Grid.Column="0" Style="{StaticResource NumberButton}" />
+                <Button Text="5" Clicked="OnInputClicked" Grid.Row="2" Grid.Column="1" Style="{StaticResource NumberButton}" />
+                <Button Text="6" Clicked="OnInputClicked" Grid.Row="2" Grid.Column="2" Style="{StaticResource NumberButton}" />
+                <Button Text="-" Clicked="OnInputClicked" Grid.Row="2" Grid.Column="3" Style="{StaticResource OperatorButton}" />
+
+                <!-- Ligne 3 -->
+                <Button Text="1" Clicked="OnInputClicked" Grid.Row="3" Grid.Column="0" Style="{StaticResource NumberButton}" />
+                <Button Text="2" Clicked="OnInputClicked" Grid.Row="3" Grid.Column="1" Style="{StaticResource NumberButton}" />
+                <Button Text="3" Clicked="OnInputClicked" Grid.Row="3" Grid.Column="2" Style="{StaticResource NumberButton}" />
+                <Button Text="+" Clicked="OnInputClicked" Grid.Row="3" Grid.Column="3" Style="{StaticResource OperatorButton}" />
+
+                <!-- Ligne 4 : ± (changement de signe), 0, point décimal, égal -->
+                <Button Text="±" Clicked="OnSignClicked"      Grid.Row="4" Grid.Column="0" Style="{StaticResource ActionButton}" />
+                <Button Text="0" Clicked="OnInputClicked"     Grid.Row="4" Grid.Column="1" Style="{StaticResource NumberButton}" />
+                <Button Text="." Clicked="OnInputClicked"     Grid.Row="4" Grid.Column="2" Style="{StaticResource NumberButton}" />
+                <Button Text="=" Clicked="OnCalculateClicked" Grid.Row="4" Grid.Column="3" Style="{StaticResource EqualButton}" />
+            </Grid>
+
+            <!-- ============ CLAVIER SCIENTIFIQUE (5 colonnes) ============ -->
+            <Grid x:Name="ScientificKeypad" IsVisible="False"
+                  RowDefinitions="*, *, *, *, *, *, *"
+                  ColumnDefinitions="*, *, *, *, *"
+                  ColumnSpacing="8" RowSpacing="8">
+
+                <!-- Mêmes noms de styles que le clavier simple, mais avec des polices plus petites -->
+                <Grid.Resources>
+                    <ResourceDictionary>
+                        <!-- Touches chiffres -->
+                        <Style x:Key="NumberButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
+                            <Setter Property="TextColor" Value="{StaticResource ColorNumberText}" />
+                            <Setter Property="FontSize" Value="22" />
+                        </Style>
+                        <!-- Touches opérateurs (+ - × ÷) -->
+                        <Style x:Key="OperatorButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
+                            <Setter Property="TextColor" Value="{StaticResource ColorOperatorText}" />
+                            <Setter Property="FontSize" Value="24" />
+                        </Style>
+                        <!-- Touches d'action (AC, ⌫, %, ±) -->
+                        <Style x:Key="ActionButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
+                            <Setter Property="TextColor" Value="{StaticResource ColorOperatorText}" />
+                            <Setter Property="FontSize" Value="18" />
+                        </Style>
+                        <!-- Touches de fonctions scientifiques -->
+                        <Style x:Key="FunctionButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
+                            <Setter Property="TextColor" Value="{StaticResource ColorFunctionText}" />
+                            <Setter Property="FontSize" Value="18" />
+                        </Style>
+                        <!-- Touche égal -->
+                        <Style x:Key="EqualButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
+                            <Setter Property="BackgroundColor" Value="{StaticResource ColorEqualBackground}" />
+                            <Setter Property="TextColor" Value="{StaticResource ColorEqualText}" />
+                            <Setter Property="FontSize" Value="24" />
+                            <Setter Property="CornerRadius" Value="30" />
+                            <!-- La touche = garde sa propre couleur d'appui -->
+                            <Setter Property="VisualStateManager.VisualStateGroups">
+                                <VisualStateGroupList>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal" />
+                                        <VisualState x:Name="Pressed">
+                                            <VisualState.Setters>
+                                                <Setter Property="BackgroundColor" Value="{StaticResource ColorEqualPressed}" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateGroupList>
+                            </Setter>
+                        </Style>
+                    </ResourceDictionary>
+                </Grid.Resources>
+
+                <!-- Ligne 0 : mode 2nd, unité d'angle, trigonométrie -->
+                <Button x:Name="Btn2nd" Text="2nd" Clicked="On2ndClicked"   Grid.Row="0" Grid.Column="0" Style="{StaticResource FunctionButton}" />
+                <Button x:Name="BtnDeg" Text="deg" Clicked="OnDegClicked"   Grid.Row="0" Grid.Column="1" Style="{StaticResource FunctionButton}" />
+                <Button x:Name="BtnSin" Text="sin" Clicked="OnInputClicked" Grid.Row="0" Grid.Column="2" Style="{StaticResource FunctionButton}" />
+                <Button x:Name="BtnCos" Text="cos" Clicked="OnInputClicked" Grid.Row="0" Grid.Column="3" Style="{StaticResource FunctionButton}" />
+                <Button x:Name="BtnTan" Text="tan" Clicked="OnInputClicked" Grid.Row="0" Grid.Column="4" Style="{StaticResource FunctionButton}" />
+
+                <!-- Ligne 1 : puissance, logarithmes, parenthèses -->
+                <Button Text="^"  Clicked="OnInputClicked" Grid.Row="1" Grid.Column="0" Style="{StaticResource FunctionButton}" />
+                <Button Text="lg" Clicked="OnInputClicked" Grid.Row="1" Grid.Column="1" Style="{StaticResource FunctionButton}" />
+                <Button Text="ln" Clicked="OnInputClicked" Grid.Row="1" Grid.Column="2" Style="{StaticResource FunctionButton}" />
+                <Button Text="("  Clicked="OnInputClicked" Grid.Row="1" Grid.Column="3" Style="{StaticResource FunctionButton}" />
+                <Button Text=")"  Clicked="OnInputClicked" Grid.Row="1" Grid.Column="4" Style="{StaticResource FunctionButton}" />
+
+                <!-- Ligne 2 : racine, remise à zéro, effacement, pourcentage, division -->
+                <Button Text="√"  Clicked="OnInputClicked"     Grid.Row="2" Grid.Column="0" Style="{StaticResource FunctionButton}" />
+                <Button Text="AC" Clicked="OnClearClicked"     Grid.Row="2" Grid.Column="1" Style="{StaticResource ActionButton}" />
+                <Button Text="⌫"  Clicked="OnBackspaceClicked" Grid.Row="2" Grid.Column="2" Style="{StaticResource ActionButton}" />
+                <Button Text="%"  Clicked="OnInputClicked"     Grid.Row="2" Grid.Column="3" Style="{StaticResource ActionButton}" />
+                <Button Text="÷"  Clicked="OnInputClicked"     Grid.Row="2" Grid.Column="4" Style="{StaticResource OperatorButton}" />
+
+                <!-- Ligne 3 -->
+                <Button Text="!" Clicked="OnInputClicked" Grid.Row="3" Grid.Column="0" Style="{StaticResource FunctionButton}" />
+                <Button Text="7" Clicked="OnInputClicked" Grid.Row="3" Grid.Column="1" Style="{StaticResource NumberButton}" />
+                <Button Text="8" Clicked="OnInputClicked" Grid.Row="3" Grid.Column="2" Style="{StaticResource NumberButton}" />
+                <Button Text="9" Clicked="OnInputClicked" Grid.Row="3" Grid.Column="3" Style="{StaticResource NumberButton}" />
+                <Button Text="×" Clicked="OnInputClicked" Grid.Row="3" Grid.Column="4" Style="{StaticResource OperatorButton}" />
+
+                <!-- Ligne 4 : 1/x utilise son propre gestionnaire (OnInverseClicked) -->
+                <Button Text="1/x" Clicked="OnInverseClicked" Grid.Row="4" Grid.Column="0" Style="{StaticResource FunctionButton}" />
+                <Button Text="4"   Clicked="OnInputClicked"   Grid.Row="4" Grid.Column="1" Style="{StaticResource NumberButton}" />
+                <Button Text="5"   Clicked="OnInputClicked"   Grid.Row="4" Grid.Column="2" Style="{StaticResource NumberButton}" />
+                <Button Text="6"   Clicked="OnInputClicked"   Grid.Row="4" Grid.Column="3" Style="{StaticResource NumberButton}" />
+                <Button Text="-"   Clicked="OnInputClicked"   Grid.Row="4" Grid.Column="4" Style="{StaticResource OperatorButton}" />
+
+                <!-- Ligne 5 -->
+                <Button Text="π" Clicked="OnInputClicked" Grid.Row="5" Grid.Column="0" Style="{StaticResource FunctionButton}" />
+                <Button Text="1" Clicked="OnInputClicked" Grid.Row="5" Grid.Column="1" Style="{StaticResource NumberButton}" />
+                <Button Text="2" Clicked="OnInputClicked" Grid.Row="5" Grid.Column="2" Style="{StaticResource NumberButton}" />
+                <Button Text="3" Clicked="OnInputClicked" Grid.Row="5" Grid.Column="3" Style="{StaticResource NumberButton}" />
+                <Button Text="+" Clicked="OnInputClicked" Grid.Row="5" Grid.Column="4" Style="{StaticResource OperatorButton}" />
+
+                <!-- Ligne 6 : ± (changement de signe), e, 0, point, égal -->
+                <Button Text="±" Clicked="OnSignClicked"      Grid.Row="6" Grid.Column="0" Style="{StaticResource ActionButton}" />
+                <Button Text="e" Clicked="OnInputClicked"     Grid.Row="6" Grid.Column="1" Style="{StaticResource NumberButton}" />
+                <Button Text="0" Clicked="OnInputClicked"     Grid.Row="6" Grid.Column="2" Style="{StaticResource NumberButton}" />
+                <Button Text="." Clicked="OnInputClicked"     Grid.Row="6" Grid.Column="3" Style="{StaticResource NumberButton}" />
+                <Button Text="=" Clicked="OnCalculateClicked" Grid.Row="6" Grid.Column="4" Style="{StaticResource EqualButton}" />
+            </Grid>
+        </Grid>
+    </Grid>
+</ContentPage>
